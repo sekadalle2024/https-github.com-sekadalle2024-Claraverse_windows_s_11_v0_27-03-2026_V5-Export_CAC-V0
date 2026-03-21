@@ -71,28 +71,43 @@ export class ClaraApiService {
     } else if (msg.includes("Database")) {
       // Case 10 (endpoint) a priorité sur Case 5 (table locale)
       routeKey = "database_endpoint";
+    } else if ((msg.includes("CIA") || msg.includes("cia") || msg.includes("Cia")) &&
+      (msg.includes("Cours") || msg.includes("COURS") || msg.includes("cours"))) {
+      // Case 11 (CIA Cours)
+      routeKey = "cia_cours";
+    } else if ((msg.includes("CIA") || msg.includes("cia") || msg.includes("Cia")) &&
+      (msg.includes("Qcm") || msg.includes("QCM") || msg.includes("Question"))) {
+      // Case 12 (CIA Qcm)
+      routeKey = "cia_qcm";
     } else if (msg.includes("CIA") || msg.includes("cia") || msg.includes("Cia")) {
-      if (msg.includes("Cours") || msg.includes("COURS") || msg.includes("cours")) {
-        // Case 11 (CIA Cours)
-        routeKey = "cia_cours";
-      } else if (msg.includes("Qcm") || msg.includes("QCM") || msg.includes("Question")) {
-        // Case 12 (CIA Qcm)
-        routeKey = "cia_qcm";
-      } else if (msg.includes("Synthèse") || msg.includes("Synth")) {
-        // Case 14 (CIA Synthèse)
-        routeKey = "cia_synthese";
-      } else {
-        // CIA Générique (Fallback ou autre usage)
-        routeKey = "cia";
-      }
-    } else if (msg.includes("Methodologie") || msg.includes("Methodo") || msg.includes("Méthodologie")) {
-      // Case 13 (Méthodologie)
-      routeKey = "methodo";
-    } else if (msg.includes("Guide") || msg.includes("guide") || msg.includes("GUIDE")) {
-      // Case 15 (Guide)
-      routeKey = "guide";
-    } else if (msg.includes("[Integration]")) {
-      routeKey = "integration";
+      // CIA Générique (Fallback ou autre usage)
+      routeKey = "cia";
+    } else if (msg.includes("Implementation_modelisation")) {
+      // Case 16 (Implementation_modelisation)
+      routeKey = "implementation_modelisation";
+    } else if (msg.includes("Implementation_programme_controle")) {
+      // Case 17 (Implementation_programme_controle)
+      routeKey = "implementation_programme_controle";
+    } else if (msg.includes("Implementation_cartographie")) {
+      // Case 18 (Implementation_cartographie)
+      routeKey = "implementation_cartographie";
+    } else if (msg.includes("Programme_controle_comptes")) {
+      // Case 19 (Programme_controle_comptes)
+      routeKey = "programme_controle_comptes";
+    } else if (msg.includes("Revue manager")) {
+      // Case 20 (Revue manager)
+      routeKey = "revue_manager";
+    } else if (msg.includes("Lead_balance")) {
+      // Case 21 (Lead_balance)
+      routeKey = "lead_balance";
+    } else if (msg.includes("Règles et méthodes comptables")) {
+      // Case 22 (Règles et méthodes comptables)
+      routeKey = "regles_comptables";
+    } else if (msg.includes("Recos_revision")) {
+      // Case 23 (Recos_revision)
+      routeKey = "recos_revision";
+    } else if (msg.includes("Design")) {
+      routeKey = "design";
     } else if (msg.includes("n8n_doc")) {
       routeKey = "n8n_doc";
     } else if (msg.includes("Htlm_processor")) {
@@ -112,8 +127,8 @@ export class ClaraApiService {
     }
 
     switch (routeKey) {
-      // ── Case 2 : [Integration] ──────────────────────────────────────────
-      case "integration":
+      // ── Case 2 : Design ──────────────────────────────────────────
+      case "design":
         console.log("🔀 Router → Case 2 : integration_windows");
         return "https://j17rkv4c.rpcld.cc/webhook/integration_windows";
 
@@ -149,21 +164,6 @@ export class ClaraApiService {
         console.log("🔀 Router → Case CIA : integration_cia");
         return "https://j17rkv4c.rpcld.cc/webhook/integration_cia";
 
-      // ── Case 13 : Méthodologie ────────────────────────────────────────────────
-      case "methodo":
-        console.log("🔀 Router → Case 13 : cia_methodo_gemini");
-        return "http://localhost:5678/webhook/cia_methodo_gemini";
-
-      // ── Case 14 : CIA Synthèse ───────────────────────────────────────────────
-      case "cia_synthese":
-        console.log("🔀 Router → Case 14 : synthese_cia_gemini");
-        return "http://localhost:5678/webhook/synthese_cia_gemini";
-
-      // ── Case 15 : Guide ──────────────────────────────────────────────────────
-      case "guide":
-        console.log("🔀 Router → Case 15 : guide_gemini");
-        return "http://localhost:5678/webhook/guide_gemini";
-
       // ── Case 6 : Algorithme ─────────────────────────────────────────────
       case "algorithme":
         console.log("🔀 Router → Case 6 : algorithme");
@@ -183,6 +183,46 @@ export class ClaraApiService {
       case "document":
         console.log("🔀 Router → Case 9 : integration_document");
         return "https://j17rkv4c.rpcld.cc/webhook/integration_document";
+
+      // ── Case 16 : Implementation_modelisation ────────────────────────────
+      case "implementation_modelisation":
+        console.log("🔀 Router → Case 16 : implementation_modelisation");
+        return "https://j17rkv4c.rpcld.cc/webhook/implementation_modelisation";
+
+      // ── Case 17 : Implementation_programme_controle ──────────────────────
+      case "implementation_programme_controle":
+        console.log("🔀 Router → Case 17 : implementation_programme_controle");
+        return "https://j17rkv4c.rpcld.cc/webhook/implementation_programme_controle";
+
+      // ── Case 18 : Implementation_cartographie ────────────────────────────
+      case "implementation_cartographie":
+        console.log("🔀 Router → Case 18 : implementation_cartographie");
+        return "https://j17rkv4c.rpcld.cc/webhook/implementation_cartographie";
+
+      // ── Case 19 : Programme_controle_comptes ─────────────────────────────
+      case "programme_controle_comptes":
+        console.log("🔀 Router → Case 19 : programme_controle_comptes");
+        return "https://j17rkv4c.rpcld.cc/webhook/programme_controle_comptes";
+
+      // ── Case 20 : Revue manager ──────────────────────────────────────────
+      case "revue_manager":
+        console.log("🔀 Router → Case 20 : revue_manager");
+        return "https://j17rkv4c.rpcld.cc/webhook/revue_manager";
+
+      // ── Case 21 : Lead_balance ───────────────────────────────────────────
+      case "lead_balance":
+        console.log("🔀 Router → Case 21 : lead_balance");
+        return "https://j17rkv4c.rpcld.cc/webhook/lead_balance";
+
+      // ── Case 22 : Règles et méthodes comptables ──────────────────────────
+      case "regles_comptables":
+        console.log("🔀 Router → Case 22 : regles_comptables");
+        return "https://j17rkv4c.rpcld.cc/webhook/regles_comptables";
+
+      // ── Case 23 : Recos_revision ─────────────────────────────────────────
+      case "recos_revision":
+        console.log("🔀 Router → Case 23 : recos_revision");
+        return "https://j17rkv4c.rpcld.cc/webhook/recos_revision";
 
       // ── Case 1 : défaut / Standard ──────────────────────────────────────
       case "default":
@@ -626,7 +666,7 @@ export class ClaraApiService {
    * Détecte et normalise le format de réponse n8n.
    * Cette fonction est conçue pour être robuste et supporter plusieurs formats de réponse.
    */
-  private normalizeN8nResponse(result: any, endpoint?: string): {
+  private normalizeN8nResponse(result: any): {
     content: string;
     metadata: any;
   } {
@@ -640,30 +680,6 @@ export class ClaraApiService {
       return {
         content: "",
         metadata: { error: "Empty response from n8n", format: "error" },
-      };
-    }
-
-    // ========================================================================
-    // FORMAT METHODO: CIA Methodo Accordion
-    // ========================================================================
-    if (
-      endpoint && endpoint.includes("methodo") &&
-      Array.isArray(result) &&
-      result.length > 0 &&
-      result[0] &&
-      typeof result[0] === "object" &&
-      "Sous-section" in result[0]
-    ) {
-      console.log('✅ FORMAT METHODO DETECTE: Réponse CIA Methodo (Etape mission - Methodo)');
-      const content = `__CIA_METHODO_ACCORDION__${JSON.stringify(result)}`;
-      console.log("🔍 === FIN ANALYSE (FORMAT METHODO) ===");
-      return {
-        content,
-        metadata: {
-          format: "cia_methodo_accordion",
-          timestamp: new Date().toISOString(),
-          totalSections: result.length,
-        },
       };
     }
 
@@ -960,7 +976,7 @@ export class ClaraApiService {
 
       // Normaliser la réponse selon son format
       console.log("🔄 Appel de normalizeN8nResponse...");
-      const { content, metadata } = this.normalizeN8nResponse(result, resolvedEndpoint);
+      const { content, metadata } = this.normalizeN8nResponse(result);
 
       console.log(`📊 === RESULTAT NORMALISATION ===`);
       console.log(`  Contenu extrait: ${content.length} caractères`);
