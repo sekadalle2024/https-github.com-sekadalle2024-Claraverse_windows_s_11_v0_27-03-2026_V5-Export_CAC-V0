@@ -122,7 +122,8 @@
             { text: "📊 Lead Balance", action: () => this.executeLeadBalance(), shortcut: "Ctrl+L" },
             { text: "📥 Export Lead Balance", action: () => this.exportLeadBalanceToExcel(), shortcut: "Ctrl+Shift+L" },
             { text: "📊 États Financiers SYSCOHADA", action: () => this.executeEtatsFinanciers(), shortcut: "Ctrl+F" },
-            { text: "📥 Export États Financiers", action: () => this.exportEtatsFinanciersToExcel(), shortcut: "Ctrl+Shift+F" }
+            { text: "📥 Export États Financiers", action: () => this.exportEtatsFinanciersToExcel(), shortcut: "Ctrl+Shift+F" },
+            { text: "📋 Exporter Liasse Officielle", action: () => this.exporterLiasseOfficielle(), shortcut: "Ctrl+Shift+O" }
           ]
         },
         {
@@ -7268,6 +7269,28 @@
     setupDevJSListeners() {
       this.addEventListenerWithCleanup(document, "claraverse:save:complete", () => { });
       this.addEventListenerWithCleanup(document, "claraverse:request:rescan", () => this.processExistingTables());
+    }
+
+    // === EXPORT LIASSE OFFICIELLE ===
+    exporterLiasseOfficielle() {
+      console.log("📋 Export Liasse Officielle déclenché");
+      
+      // Chercher le conteneur des états financiers
+      const container = document.querySelector('.etats-fin-container');
+      
+      if (!container) {
+        this.showAlert("⚠️ Aucun état financier disponible. Veuillez d'abord générer les états financiers.");
+        return;
+      }
+      
+      // Vérifier que le handler est chargé
+      if (typeof window.ExportLiasseHandler === 'undefined') {
+        this.showAlert("❌ Module d'export non chargé. Veuillez recharger la page.");
+        return;
+      }
+      
+      // Appeler le handler
+      window.ExportLiasseHandler.exportFromContextMenu(container);
     }
 
     cleanup() {

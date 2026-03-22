@@ -13,6 +13,10 @@ import re
 # Import du module TFT
 from tableau_flux_tresorerie import calculer_tft
 
+# Import du module Annexes
+from annexes_liasse import calculer_annexes
+from annexes_html import generate_annexes_html
+
 # Configuration du logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("etats_financiers")
@@ -653,12 +657,34 @@ def generate_etats_financiers_html(results: Dict[str, Any]) -> str:
     </style>
     """
     
+    # Préparer les données pour l'export (sans les contrôles pour alléger)
+    export_data = {
+        'bilan_actif': results['bilan_actif'],
+        'bilan_passif': results['bilan_passif'],
+        'charges': results['charges'],
+        'produits': results['produits'],
+        'totaux': totaux
+    }
+    
+    # Encoder les données en JSON pour l'attribut data-results
+    import json
+    results_json = json.dumps(export_data, ensure_ascii=False)
+    results_json_escaped = results_json.replace('"', '&quot;')
+    
     html += f"""
-    <div class="etats-fin-container">
+    <div class="etats-fin-container" data-results="{results_json_escaped}">
         <div class="etats-fin-header">
             <h2>📊 États Financiers SYSCOHADA Révisé</h2>
             <p>Bilan, Compte de Résultat, TFT et États de Contrôle</p>
         </div>
+    """
+    
+    # Stocker aussi dans window pour accès JavaScript
+    html += f"""
+    <script>
+    window.lastEtatsFinanciersResults = {results_json};
+    console.log('✅ Résultats états financiers stockés dans window.lastEtatsFinanciersResults');
+    </script>
     """
     
     # 1. BILAN
@@ -715,6 +741,10 @@ def generate_etats_financiers_html(results: Dict[str, Any]) -> str:
     # 6. CONTRÔLES TFT (si disponibles)
     if 'tft' in results and results['tft'] and 'controles' in results['tft']:
         html += generate_controles_tft_html(results['tft']['controles'])
+    
+    # 7. ANNEXES (Notes calculables)
+    if 'annexes' in results and results['annexes']:
+        html += generate_annexes_html(results['annexes'])
     
     html += """
     </div>
@@ -1439,6 +1469,15 @@ async def process_excel(request: ExcelUploadRequest):
             except Exception as e:
                 logger.warning(f"⚠️ Erreur calcul TFT: {e}")
                 # Continuer sans TFT
+        
+        # Calculer les annexes
+        try:
+            annexes_data = calculer_annexes(results)
+            results['annexes'] = annexes_data
+            logger.info("✅ Annexes calculées avec succès")
+        except Exception as e:
+            logger.warning(f"⚠️ Erreur calcul annexes: {e}")
+            # Continuer sans annexes
         
         # Générer le HTML
         html = generate_etats_financiers_html(results)
