@@ -657,7 +657,7 @@ def generate_etats_financiers_html(results: Dict[str, Any]) -> str:
     <div class="etats-fin-container">
         <div class="etats-fin-header">
             <h2>📊 États Financiers SYSCOHADA Révisé</h2>
-            <p>Bilan, Compte de Résultat et États de Contrôle</p>
+            <p>Bilan, Compte de Résultat, TFT et États de Contrôle</p>
         </div>
     """
     
@@ -705,8 +705,16 @@ def generate_etats_financiers_html(results: Dict[str, Any]) -> str:
         </div>
     """
     
-    # 4. ÉTATS DE CONTRÔLE (À LA FIN)
+    # 4. TABLEAU DES FLUX DE TRÉSORERIE (si disponible)
+    if 'tft' in results and results['tft']:
+        html += generate_tft_html(results['tft'])
+    
+    # 5. ÉTATS DE CONTRÔLE (À LA FIN)
     html += generate_controles_html(controles, totaux)
+    
+    # 6. CONTRÔLES TFT (si disponibles)
+    if 'tft' in results and results['tft'] and 'controles' in results['tft']:
+        html += generate_controles_tft_html(results['tft']['controles'])
     
     html += """
     </div>
@@ -1097,6 +1105,259 @@ def generate_controles_html(controles: Dict, totaux: Dict) -> str:
     return html
 
 
+def generate_tft_html(tft_data: Dict[str, Any]) -> str:
+    """Génère le HTML pour le Tableau des Flux de Trésorerie"""
+    if not tft_data:
+        return ''
+    
+    html = """
+    <div class="etats-fin-section" data-section="tft">
+        <div class="section-header-ef">
+            <span>💧 TABLEAU DES FLUX DE TRÉSORERIE (TFT)</span>
+            <span class="arrow">›</span>
+        </div>
+        <div class="section-content-ef">
+    """
+    
+    # A. Trésorerie d'ouverture
+    html += f"""
+        <div class="poste-item" style="background: #f0f9ff;">
+            <span class="poste-ref">ZA</span>
+            <span class="poste-libelle">Trésorerie au 1er janvier</span>
+            <span class="poste-montant">{format_number(tft_data.get('ZA_tresorerie_ouverture', 0))}</span>
+        </div>
+    """
+    
+    # B. Flux opérationnels
+    html += """
+        <div style="padding: 10px 18px; background: #e0f2fe; font-weight: 600; border-top: 1px solid #bae6fd;">
+            FLUX DE TRÉSORERIE PROVENANT DES ACTIVITÉS OPÉRATIONNELLES
+        </div>
+    """
+    
+    flux_ops = [
+        ('FA', 'Capacité d\'Autofinancement Globale (CAFG)', 'FA_cafg'),
+        ('FB', 'Variation actif circulant HAO', 'FB_variation_actif_hao'),
+        ('FC', 'Variation des stocks', 'FC_variation_stocks'),
+        ('FD', 'Variation des créances', 'FD_variation_creances'),
+        ('FE', 'Variation du passif circulant', 'FE_variation_dettes'),
+    ]
+    
+    for ref, libelle, key in flux_ops:
+        html += f"""
+        <div class="poste-item">
+            <span class="poste-ref">{ref}</span>
+            <span class="poste-libelle">{libelle}</span>
+            <span class="poste-montant">{format_number(tft_data.get(key, 0))}</span>
+        </div>
+        """
+    
+    html += f"""
+        <div class="total-section">
+            <span>ZB - FLUX OPÉRATIONNELS</span>
+            <span>{format_number(tft_data.get('ZB_flux_operationnels', 0))}</span>
+        </div>
+    """
+    
+    # C. Flux d'investissement
+    html += """
+        <div style="padding: 10px 18px; background: #fef3c7; font-weight: 600; border-top: 1px solid #fde68a;">
+            FLUX DE TRÉSORERIE PROVENANT DES ACTIVITÉS D'INVESTISSEMENT
+        </div>
+    """
+    
+    flux_inv = [
+        ('FF', 'Décaissements acquisitions immobilisations incorporelles', 'FF_decaissement_incorp'),
+        ('FG', 'Décaissements acquisitions immobilisations corporelles', 'FG_decaissement_corp'),
+        ('FH', 'Décaissements acquisitions immobilisations financières', 'FH_decaissement_fin'),
+        ('FI', 'Encaissements cessions immobilisations', 'FI_encaissement_cessions_immob'),
+        ('FJ', 'Encaissements cessions immobilisations financières', 'FJ_encaissement_cessions_fin'),
+    ]
+    
+    for ref, libelle, key in flux_inv:
+        html += f"""
+        <div class="poste-item">
+            <span class="poste-ref">{ref}</span>
+            <span class="poste-libelle">{libelle}</span>
+            <span class="poste-montant">{format_number(tft_data.get(key, 0))}</span>
+        </div>
+        """
+    
+    html += f"""
+        <div class="total-section">
+            <span>ZC - FLUX INVESTISSEMENT</span>
+            <span>{format_number(tft_data.get('ZC_flux_investissement', 0))}</span>
+        </div>
+    """
+    
+    # D. Flux capitaux propres
+    html += """
+        <div style="padding: 10px 18px; background: #dcfce7; font-weight: 600; border-top: 1px solid #bbf7d0;">
+            FLUX DE TRÉSORERIE - FINANCEMENT PAR CAPITAUX PROPRES
+        </div>
+    """
+    
+    flux_cp = [
+        ('FK', 'Augmentation de capital', 'FK_augmentation_capital'),
+        ('FL', 'Subventions d\'investissement reçues', 'FL_subventions_recues'),
+        ('FM', 'Prélèvements sur le capital', 'FM_prelevement_capital'),
+        ('FN', 'Dividendes versés', 'FN_dividendes_verses'),
+    ]
+    
+    for ref, libelle, key in flux_cp:
+        html += f"""
+        <div class="poste-item">
+            <span class="poste-ref">{ref}</span>
+            <span class="poste-libelle">{libelle}</span>
+            <span class="poste-montant">{format_number(tft_data.get(key, 0))}</span>
+        </div>
+        """
+    
+    html += f"""
+        <div class="total-section">
+            <span>ZD - FLUX CAPITAUX PROPRES</span>
+            <span>{format_number(tft_data.get('ZD_flux_capitaux_propres', 0))}</span>
+        </div>
+    """
+    
+    # E. Flux capitaux étrangers
+    html += """
+        <div style="padding: 10px 18px; background: #fce7f3; font-weight: 600; border-top: 1px solid #fbcfe8;">
+            FLUX DE TRÉSORERIE - FINANCEMENT PAR CAPITAUX ÉTRANGERS
+        </div>
+    """
+    
+    flux_ce = [
+        ('FO', 'Nouveaux emprunts', 'FO_nouveaux_emprunts'),
+        ('FP', 'Autres dettes financières', 'FP_nouvelles_dettes'),
+        ('FQ', 'Remboursements', 'FQ_remboursements'),
+    ]
+    
+    for ref, libelle, key in flux_ce:
+        html += f"""
+        <div class="poste-item">
+            <span class="poste-ref">{ref}</span>
+            <span class="poste-libelle">{libelle}</span>
+            <span class="poste-montant">{format_number(tft_data.get(key, 0))}</span>
+        </div>
+        """
+    
+    html += f"""
+        <div class="total-section">
+            <span>ZE - FLUX CAPITAUX ÉTRANGERS</span>
+            <span>{format_number(tft_data.get('ZE_flux_capitaux_etrangers', 0))}</span>
+        </div>
+    """
+    
+    # F. Total financement
+    html += f"""
+        <div class="total-section" style="background: #e0e7ff;">
+            <span>ZF - FLUX FINANCEMENT (D+E)</span>
+            <span>{format_number(tft_data.get('ZF_flux_financement', 0))}</span>
+        </div>
+    """
+    
+    # G & H. Variation et trésorerie finale
+    variation_class = "resultat" if tft_data.get('ZG_variation_tresorerie', 0) >= 0 else "resultat negatif"
+    html += f"""
+        <div class="total-section {variation_class}">
+            <span>ZG - VARIATION TRÉSORERIE (B+C+F)</span>
+            <span>{format_number(tft_data.get('ZG_variation_tresorerie', 0))}</span>
+        </div>
+        <div class="total-section" style="background: #dbeafe; border-top: 3px solid #3b82f6;">
+            <span>ZH - TRÉSORERIE AU 31 DÉCEMBRE</span>
+            <span>{format_number(tft_data.get('ZH_tresorerie_cloture', 0))}</span>
+        </div>
+    """
+    
+    html += """
+        </div>
+    </div>
+    """
+    
+    return html
+
+
+def generate_controles_tft_html(controles_tft: Dict) -> str:
+    """Génère le HTML des contrôles TFT"""
+    if not controles_tft:
+        return ''
+    
+    html = """
+    <div class="controle-section">
+        <div class="controle-header">
+            💧 CONTRÔLES TFT
+        </div>
+    """
+    
+    # 1. Cohérence trésorerie
+    coh_tres = controles_tft.get('coherence_tresorerie', {})
+    coherent = coh_tres.get('coherent', False)
+    badge_class = 'success' if coherent else 'error'
+    item_class = 'ok' if coherent else 'error'
+    
+    html += f"""
+        <div class="controle-item {item_class}">
+            <div class="controle-label">
+                💰 Cohérence Trésorerie
+                <span class="badge {badge_class}">{'✓ Cohérent' if coherent else '✗ Incohérent'}</span>
+            </div>
+            <div class="controle-value">
+                Trésorerie calculée (ZH): {format_number(coh_tres.get('tresorerie_calculee', 0))}
+                <br>Trésorerie bilan N: {format_number(coh_tres.get('tresorerie_bilan', 0))}
+                <br>Différence: {format_number(coh_tres.get('difference', 0))}
+            </div>
+        </div>
+    """
+    
+    # 2. Équilibre des flux
+    eq_flux = controles_tft.get('equilibre_flux', {})
+    equilibre = eq_flux.get('equilibre', False)
+    badge_class = 'success' if equilibre else 'error'
+    item_class = 'ok' if equilibre else 'error'
+    
+    html += f"""
+        <div class="controle-item {item_class}">
+            <div class="controle-label">
+                ⚖️ Équilibre des Flux
+                <span class="badge {badge_class}">{'✓ Équilibré' if equilibre else '✗ Déséquilibré'}</span>
+            </div>
+            <div class="controle-value">
+                Flux opérationnels: {format_number(eq_flux.get('flux_operationnels', 0))}
+                <br>Flux investissement: {format_number(eq_flux.get('flux_investissement', 0))}
+                <br>Flux financement: {format_number(eq_flux.get('flux_financement', 0))}
+                <br>Total: {format_number(eq_flux.get('total', 0))}
+                <br>Variation trésorerie: {format_number(eq_flux.get('variation_tresorerie', 0))}
+            </div>
+        </div>
+    """
+    
+    # 3. Cohérence CAFG
+    cafg_data = controles_tft.get('coherence_cafg', {})
+    if cafg_data:
+        html += f"""
+        <div class="controle-item ok">
+            <div class="controle-label">
+                📊 Cohérence CAFG
+            </div>
+            <div class="controle-value">
+                Résultat net: {format_number(cafg_data.get('resultat_net', 0))}
+                <br>+ Dotations: {format_number(cafg_data.get('dotations', 0))}
+                <br>- Reprises: {format_number(cafg_data.get('reprises', 0))}
+                <br>+ Valeur compt. cessions: {format_number(cafg_data.get('valeur_comptable_cessions', 0))}
+                <br>- Produits cessions: {format_number(cafg_data.get('produits_cessions', 0))}
+                <br>= CAFG: {format_number(cafg_data.get('cafg', 0))}
+            </div>
+        </div>
+        """
+    
+    html += """
+    </div>
+    """
+    
+    return html
+
+
 def generate_section_html(section_id: str, title: str, postes: Dict, total: float) -> str:
     """Génère le HTML pour une section d'états financiers"""
     if not postes:
@@ -1141,6 +1402,7 @@ def generate_section_html(section_id: str, title: str, postes: Dict, total: floa
 async def process_excel(request: ExcelUploadRequest):
     """
     Traite un fichier Excel de balance et génère les états financiers SYSCOHADA.
+    Si une balance N-1 est fournie, calcule également le TFT.
     """
     try:
         logger.info(f"📥 Réception fichier: {request.filename}")
@@ -1149,10 +1411,10 @@ async def process_excel(request: ExcelUploadRequest):
         file_content = base64.b64decode(request.file_base64)
         logger.info(f"📂 Fichier décodé: {len(file_content)} bytes")
         
-        # Lire le fichier Excel (Balance)
+        # Lire le fichier Excel (Balance N)
         excel_file = io.BytesIO(file_content)
         balance_df = pd.read_excel(excel_file, sheet_name=0)
-        logger.info(f"📊 Balance chargée: {len(balance_df)} lignes")
+        logger.info(f"📊 Balance N chargée: {len(balance_df)} lignes")
         
         # Charger le tableau de correspondance
         correspondances = load_tableau_correspondance()
@@ -1160,12 +1422,34 @@ async def process_excel(request: ExcelUploadRequest):
         # Traiter la balance et générer les états financiers
         results = process_balance_to_etats_financiers(balance_df, correspondances)
         
+        # Si balance N-1 fournie, calculer le TFT
+        if request.file_n1_base64:
+            try:
+                logger.info(f"📥 Réception balance N-1: {request.filename_n1}")
+                file_n1_content = base64.b64decode(request.file_n1_base64)
+                excel_file_n1 = io.BytesIO(file_n1_content)
+                balance_n1_df = pd.read_excel(excel_file_n1, sheet_name=0)
+                logger.info(f"📊 Balance N-1 chargée: {len(balance_n1_df)} lignes")
+                
+                # Calculer le TFT
+                resultat_net = results['totaux']['resultat_net']
+                tft_data = calculer_tft(balance_df, balance_n1_df, resultat_net)
+                results['tft'] = tft_data
+                logger.info("✅ TFT calculé avec succès")
+            except Exception as e:
+                logger.warning(f"⚠️ Erreur calcul TFT: {e}")
+                # Continuer sans TFT
+        
         # Générer le HTML
         html = generate_etats_financiers_html(results)
         
+        message = f"États financiers générés avec succès à partir de {request.filename}"
+        if request.file_n1_base64 and 'tft' in results:
+            message += f" et {request.filename_n1} (avec TFT)"
+        
         return EtatsFinanciersResponse(
             success=True,
-            message=f"États financiers générés avec succès à partir de {request.filename}",
+            message=message,
             results=results,
             html=html
         )
