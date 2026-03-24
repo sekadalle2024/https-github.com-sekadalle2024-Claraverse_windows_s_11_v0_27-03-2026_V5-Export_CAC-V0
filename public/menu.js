@@ -169,6 +169,14 @@
             { text: "📖 Export Rapport Final", action: () => this.exportAuditReport('rapport_final') },
             { text: "📝 Export FRAP Individuelle", action: () => this.exportFrapIndividuelle(), shortcut: "Ctrl+Shift+F" }
           ]
+        },
+        {
+          id: "rapports-cac", title: "Rapports CAC & Expert-Comptable", icon: "🎓",
+          items: [
+            { text: "📊 Export Synthèse CAC", action: () => this.exportSyntheseCAC(), shortcut: "Ctrl+Shift+C" },
+            { text: "📋 Export Points Révision Comptes", action: () => this.exportPointsRevision() },
+            { text: "🔍 Export Points Contrôle Interne", action: () => this.exportPointsControleInterne() }
+          ]
         }
       ];
     }
@@ -379,6 +387,8 @@
         if (e.ctrlKey && e.shiftKey && e.key === "R" && this.targetTable) { e.preventDefault(); this.exportAuditReport(); }
         // Raccourci Export FRAP Individuelle
         if (e.ctrlKey && e.shiftKey && e.key === "F" && this.targetTable) { e.preventDefault(); this.exportFrapIndividuelle(); }
+        // Raccourci Export Synthèse CAC
+        if (e.ctrlKey && e.shiftKey && e.key === "C" && this.targetTable) { e.preventDefault(); this.exportSyntheseCAC(); }
       });
     }
 
@@ -7291,6 +7301,588 @@
       
       // Appeler le handler
       window.ExportLiasseHandler.exportFromContextMenu(container);
+    }
+
+    // === EXPORT SYNTHÈSE CAC ===
+    /**
+     * Export Synthèse CAC - Collecte tous les points d'audit (FRAP, Recos révision, Recos contrôle interne)
+     * et génère un rapport structuré au format CAC/Expert-Comptable
+     */
+    async exportSyntheseCAC() {
+      try {
+        this.showQuickNotification("📊 Export Synthèse CAC en cours...");
+
+        // Rechercher toutes les tables dans le chat
+        const chatContainer = document.querySelector('div[class*="prose"]') || document.body;
+        const allTables = Array.from(chatContainer.querySelectorAll('table'));
+
+        if (allTables.length === 0) {
+          this.showAlert("⚠️ Aucune table trouvée dans le chat.");
+          return;
+        }
+
+        console.log(`🔍 [Export CAC] ${allTables.length} table(s) trouvée(s) dans le chat`);
+
+        // Collecter les différents types de points d'audit
+        const frapPoints = this.collectFrapPoints(allTables);
+        const recosRevisionPoints = this.collectRecosRevisionPoints(allTables);
+        const recosControleInternePoints = this.collectRecosControleInternePoints(allTables);
+
+        console.log(`📊 [Export CAC] Points collectés:`);
+        console.log(`   - FRAP: ${frapPoints.length}`);
+        console.log(`   - Recos Révision: ${recosRevisionPoints.length}`);
+        console.log(`   - Recos Contrôle Interne: ${recosControleInternePoints.length}`);
+
+        if (frapPoints.length === 0 && recosRevisionPoints.length === 0 && recosControleInternePoints.length === 0) {
+          this.showAlert("⚠️ Aucun point d'audit CAC détecté dans le chat.\n\nRecherche:\n- Tables FRAP\n- Tables Recos révision des comptes\n- Tables Recos contrôle interne comptable");
+          return;
+        }
+
+        // Préparer les données pour le backend
+        const requestData = {
+          frap_points: frapPoints,
+          recos_revision_points: recosRevisionPoints,
+          recos_controle_interne_points: recosControleInternePoints,
+          date_rapport: new Date().toISOString().split('T')[0]
+        };
+
+        try {
+          // Appeler le backend Python
+          const response = await fetch('http://localhost:5000/api/word/export-synthese-cac', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestData)
+          });
+
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Erreur serveur');
+          }
+
+          // Télécharger le fichier
+          const blob = await response.blob();
+          const timestamp = new Date().toISOString().slice(0, 19).replace(/[:]/g, "-");
+          const filename = `synthese_cac_${timestamp}.docx`;
+
+          const link = document.createElement('a');
+          link.href = URL.createObjectURL(blob);
+          link.download = filename;
+          link.click();
+          URL.revokeObjectURL(link.href);
+
+          const totalPoints = frapPoints.length + recosRevisionPoints.length + recosControleInternePoints.length;
+          this.showQuickNotification(`✅ Synthèse CAC exportée! (${totalPoints} points)`);
+
+        } catch (backendError) {
+          console.error("Erreur backend:", backendError);
+
+          // Fallback vers génération JS si le backend n'est pas disponible
+          if (backendError.message.includes('fetch') || backendError.message.includes('NetworkError') || backendError.message.includes('Failed')) {
+            console.log("⚠️ Backend non disponible, utilisation du fallback JS...");
+            return this.exportSyntheseCAC_JS(frapPoints, recosRevisionPoints, recosControleInternePoints);
+          }
+
+          this.showAlert(`❌ Erreur: ${backendError.message}`);
+        }
+
+      } catch (error) {
+        console.error("Erreur export synthèse CAC:", error);
+        this.showAlert(`❌ Erreur: ${error.message}`);
+      }
+    }
+
+    /**
+     * Collecter les points FRAP (Feuille de Révélation et d'Analyse de Problème)
+     */
+    collectFrapPoints(tables) {
+      const frapPoints = [];
+
+      for (const table of tables) {
+        // Chercher la div parente contenant la table
+        const parentDiv = table.closest('div[class*="prose"]');
+        if (!parentDiv) continue;
+
+        // Extraire toutes les tables dans cette div
+        const tablesInDiv = Array.from(parentDiv.querySelectorAll('table'));
+        
+        // Vérifier si la première table contient "Frap" dans l'en-tête ou les données
+        if (tablesInDiv.length === 0) continue;
+        
+        const firstTable = tablesInDiv[0];
+        const firstTableData = this.extractTableDataOptimized(firstTable);
+        
+        // Vérifier si c'est une table FRAP
+        const isFrap = firstTableData.some(row => 
+          row.some(cell => (cell || '').toLowerCase().includes('frap'))
+        );
+
+        if (!isFrap) continue;
+
+        console.log(`✅ [FRAP] Table FRAP détectée avec ${tablesInDiv.length} sous-tables`);
+
+        // Extraire les données de toutes les tables de ce point FRAP
+        const frapData = {
+          metadata: {},
+          intitule: '',
+          observation: '',
+          constat: '',
+          risque: '',
+          recommandation: ''
+        };
+
+        tablesInDiv.forEach((subTable, index) => {
+          const data = this.extractTableDataOptimized(subTable);
+          
+          if (index === 0) {
+            // Table 1: Métadonnées (Etape, Norme, Méthode, Reference)
+            data.forEach(row => {
+              if (row.length >= 2) {
+                const key = (row[0] || '').toLowerCase().trim();
+                const value = row[1] || '';
+                if (key.includes('etape')) frapData.metadata.etape = value;
+                if (key.includes('norme')) frapData.metadata.norme = value;
+                if (key.includes('méthode') || key.includes('methode')) frapData.metadata.methode = value;
+                if (key.includes('reference') || key.includes('référence')) frapData.metadata.reference = value;
+              }
+            });
+          } else if (index === 1 && data.length > 0) {
+            // Table 2: Intitulé
+            frapData.intitule = data[0][0] || data[0][1] || '';
+          } else if (index === 2 && data.length > 0) {
+            // Table 3: Observation
+            frapData.observation = data[0][0] || data[0][1] || '';
+          } else if (index === 3 && data.length > 0) {
+            // Table 4: Constat
+            frapData.constat = data[0][0] || data[0][1] || '';
+          } else if (index === 4 && data.length > 0) {
+            // Table 5: Risque
+            frapData.risque = data[0][0] || data[0][1] || '';
+          } else if (index === 5 && data.length > 0) {
+            // Table 6: Recommandation
+            frapData.recommandation = data[0][0] || data[0][1] || '';
+          }
+        });
+
+        if (frapData.intitule) {
+          frapPoints.push(frapData);
+        }
+      }
+
+      return frapPoints;
+    }
+
+    /**
+     * Collecter les points de Recommandations Révision des Comptes
+     */
+    collectRecosRevisionPoints(tables) {
+      const recosPoints = [];
+
+      for (const table of tables) {
+        const parentDiv = table.closest('div[class*="prose"]');
+        if (!parentDiv) continue;
+
+        const tablesInDiv = Array.from(parentDiv.querySelectorAll('table'));
+        if (tablesInDiv.length === 0) continue;
+        
+        const firstTable = tablesInDiv[0];
+        const firstTableData = this.extractTableDataOptimized(firstTable);
+        
+        // Vérifier si c'est une table Recos révision des comptes
+        const isRecosRevision = firstTableData.some(row => 
+          row.some(cell => {
+            const cellLower = (cell || '').toLowerCase();
+            return cellLower.includes('recos') && cellLower.includes('revision') || 
+                   cellLower.includes('recommendations') && cellLower.includes('comptable');
+          })
+        );
+
+        if (!isRecosRevision) continue;
+
+        console.log(`✅ [Recos Révision] Table détectée avec ${tablesInDiv.length} sous-tables`);
+
+        const recosData = {
+          metadata: {},
+          intitule: '',
+          description: '',
+          observation: '',
+          ajustement: '',
+          regularisation: ''
+        };
+
+        tablesInDiv.forEach((subTable, index) => {
+          const data = this.extractTableDataOptimized(subTable);
+          
+          if (index === 0) {
+            // Table 1: Métadonnées
+            data.forEach(row => {
+              if (row.length >= 2) {
+                const key = (row[0] || '').toLowerCase().trim();
+                const value = row[1] || '';
+                if (key.includes('etape')) recosData.metadata.etape = value;
+                if (key.includes('norme')) recosData.metadata.norme = value;
+                if (key.includes('méthode') || key.includes('methode')) recosData.metadata.methode = value;
+                if (key.includes('reference') || key.includes('référence')) recosData.metadata.reference = value;
+              }
+            });
+          } else if (index === 1 && data.length > 0) {
+            recosData.intitule = data[0][0] || data[0][1] || '';
+          } else if (index === 2 && data.length > 0) {
+            recosData.description = data[0][0] || data[0][1] || '';
+          } else if (index === 3 && data.length > 0) {
+            recosData.observation = data[0][0] || data[0][1] || '';
+          } else if (index === 4 && data.length > 0) {
+            recosData.ajustement = data[0][0] || data[0][1] || '';
+          } else if (index === 5 && data.length > 0) {
+            recosData.regularisation = data[0][0] || data[0][1] || '';
+          }
+        });
+
+        if (recosData.intitule) {
+          recosPoints.push(recosData);
+        }
+      }
+
+      return recosPoints;
+    }
+
+    /**
+     * Collecter les points de Recommandations Contrôle Interne Comptable
+     */
+    collectRecosControleInternePoints(tables) {
+      const recosPoints = [];
+
+      for (const table of tables) {
+        const parentDiv = table.closest('div[class*="prose"]');
+        if (!parentDiv) continue;
+
+        const tablesInDiv = Array.from(parentDiv.querySelectorAll('table'));
+        if (tablesInDiv.length === 0) continue;
+        
+        const firstTable = tablesInDiv[0];
+        const firstTableData = this.extractTableDataOptimized(firstTable);
+        
+        // Vérifier si c'est une table Recos contrôle interne comptable
+        const isRecosCI = firstTableData.some(row => 
+          row.some(cell => {
+            const cellLower = (cell || '').toLowerCase();
+            return (cellLower.includes('recos') || cellLower.includes('recommandation')) && 
+                   cellLower.includes('controle') && cellLower.includes('interne') && 
+                   cellLower.includes('comptable');
+          })
+        );
+
+        if (!isRecosCI) continue;
+
+        console.log(`✅ [Recos CI] Table détectée avec ${tablesInDiv.length} sous-tables`);
+
+        const recosData = {
+          metadata: {},
+          intitule: '',
+          observation: '',
+          constat: '',
+          risque: '',
+          recommandation: ''
+        };
+
+        tablesInDiv.forEach((subTable, index) => {
+          const data = this.extractTableDataOptimized(subTable);
+          
+          if (index === 0) {
+            // Table 1: Métadonnées
+            data.forEach(row => {
+              if (row.length >= 2) {
+                const key = (row[0] || '').toLowerCase().trim();
+                const value = row[1] || '';
+                if (key.includes('etape')) recosData.metadata.etape = value;
+                if (key.includes('norme')) recosData.metadata.norme = value;
+                if (key.includes('méthode') || key.includes('methode')) recosData.metadata.methode = value;
+                if (key.includes('reference') || key.includes('référence')) recosData.metadata.reference = value;
+              }
+            });
+          } else if (index === 1 && data.length > 0) {
+            recosData.intitule = data[0][0] || data[0][1] || '';
+          } else if (index === 2 && data.length > 0) {
+            recosData.observation = data[0][0] || data[0][1] || '';
+          } else if (index === 3 && data.length > 0) {
+            recosData.constat = data[0][0] || data[0][1] || '';
+          } else if (index === 4 && data.length > 0) {
+            recosData.risque = data[0][0] || data[0][1] || '';
+          } else if (index === 5 && data.length > 0) {
+            recosData.recommandation = data[0][0] || data[0][1] || '';
+          }
+        });
+
+        if (recosData.intitule) {
+          recosPoints.push(recosData);
+        }
+      }
+
+      return recosPoints;
+    }
+
+    /**
+     * Fallback JavaScript pour générer le rapport CAC si le backend n'est pas disponible
+     */
+    async exportSyntheseCAC_JS(frapPoints, recosRevisionPoints, recosControleInternePoints) {
+      try {
+        await this.ensureDocxLibraryLoaded();
+
+        const doc = new docx.Document({
+          sections: [{
+            properties: {},
+            children: [
+              // En-tête du rapport
+              new docx.Paragraph({
+                text: "SYNTHÈSE DES TRAVAUX DE RÉVISION",
+                heading: docx.HeadingLevel.HEADING_1,
+                alignment: docx.AlignmentType.CENTER,
+                spacing: { after: 400 }
+              }),
+
+              // 1. INTRODUCTION
+              new docx.Paragraph({
+                text: "1. INTRODUCTION",
+                heading: docx.HeadingLevel.HEADING_2,
+                spacing: { before: 300, after: 200 }
+              }),
+              new docx.Paragraph({
+                text: "Le présent document synthétise les observations et recommandations issues de nos travaux de révision des comptes et d'évaluation du contrôle interne comptable.",
+                spacing: { after: 200 }
+              }),
+
+              // 2. OBSERVATIONS D'AUDIT (Recos Révision)
+              new docx.Paragraph({
+                text: "2. OBSERVATIONS D'AUDIT",
+                heading: docx.HeadingLevel.HEADING_2,
+                spacing: { before: 400, after: 200 }
+              }),
+              ...this.generateRecosRevisionSection_JS(recosRevisionPoints),
+
+              // 3. POINTS DE CONTRÔLE INTERNE
+              new docx.Paragraph({
+                text: "3. POINTS DE CONTRÔLE INTERNE",
+                heading: docx.HeadingLevel.HEADING_2,
+                spacing: { before: 400, after: 200 }
+              }),
+              ...this.generateControleInterneSection_JS(frapPoints, recosControleInternePoints)
+            ]
+          }]
+        });
+
+        const blob = await docx.Packer.toBlob(doc);
+        const timestamp = new Date().toISOString().slice(0, 19).replace(/[:]/g, "-");
+        const filename = `synthese_cac_${timestamp}.docx`;
+
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+        link.click();
+        URL.revokeObjectURL(link.href);
+
+        const totalPoints = frapPoints.length + recosRevisionPoints.length + recosControleInternePoints.length;
+        this.showQuickNotification(`✅ Synthèse CAC exportée (JS)! (${totalPoints} points)`);
+
+      } catch (error) {
+        console.error("Erreur export CAC JS:", error);
+        this.showAlert(`❌ Erreur génération JS: ${error.message}`);
+      }
+    }
+
+    generateRecosRevisionSection_JS(recosPoints) {
+      const paragraphs = [];
+
+      if (recosPoints.length === 0) {
+        paragraphs.push(new docx.Paragraph({
+          text: "Aucune observation d'audit sur la révision des comptes.",
+          italics: true,
+          spacing: { after: 200 }
+        }));
+        return paragraphs;
+      }
+
+      recosPoints.forEach((point, index) => {
+        paragraphs.push(
+          new docx.Paragraph({
+            text: `2.${index + 1}. ${point.intitule}`,
+            heading: docx.HeadingLevel.HEADING_3,
+            spacing: { before: 300, after: 150 }
+          })
+        );
+
+        if (point.observation) {
+          paragraphs.push(
+            new docx.Paragraph({ text: "Observation:", bold: true, spacing: { before: 100 } }),
+            new docx.Paragraph({ text: point.observation, spacing: { after: 150 } })
+          );
+        }
+
+        if (point.ajustement) {
+          paragraphs.push(
+            new docx.Paragraph({ text: "Ajustement proposé:", bold: true, spacing: { before: 100 } }),
+            new docx.Paragraph({ text: point.ajustement, spacing: { after: 150 } })
+          );
+        }
+
+        if (point.regularisation) {
+          paragraphs.push(
+            new docx.Paragraph({ text: "Régularisation comptable:", bold: true, spacing: { before: 100 } }),
+            new docx.Paragraph({ text: point.regularisation, spacing: { after: 200 } })
+          );
+        }
+      });
+
+      return paragraphs;
+    }
+
+    generateControleInterneSection_JS(frapPoints, recosPoints) {
+      const paragraphs = [];
+      const allPoints = [...frapPoints, ...recosPoints];
+
+      if (allPoints.length === 0) {
+        paragraphs.push(new docx.Paragraph({
+          text: "Aucun point de contrôle interne identifié.",
+          italics: true,
+          spacing: { after: 200 }
+        }));
+        return paragraphs;
+      }
+
+      allPoints.forEach((point, index) => {
+        paragraphs.push(
+          new docx.Paragraph({
+            text: `3.${index + 1}. ${point.intitule}`,
+            heading: docx.HeadingLevel.HEADING_3,
+            spacing: { before: 300, after: 150 }
+          })
+        );
+
+        if (point.observation) {
+          paragraphs.push(
+            new docx.Paragraph({ text: "Observation:", bold: true, spacing: { before: 100 } }),
+            new docx.Paragraph({ text: point.observation, spacing: { after: 150 } })
+          );
+        }
+
+        if (point.constat) {
+          paragraphs.push(
+            new docx.Paragraph({ text: "Constat:", bold: true, spacing: { before: 100 } }),
+            new docx.Paragraph({ text: point.constat, spacing: { after: 150 } })
+          );
+        }
+
+        if (point.risque) {
+          paragraphs.push(
+            new docx.Paragraph({ text: "Risques:", bold: true, spacing: { before: 100 } }),
+            new docx.Paragraph({ text: point.risque, spacing: { after: 150 } })
+          );
+        }
+
+        if (point.recommandation) {
+          paragraphs.push(
+            new docx.Paragraph({ text: "Recommandation:", bold: true, spacing: { before: 100 } }),
+            new docx.Paragraph({ text: point.recommandation, spacing: { after: 200 } })
+          );
+        }
+      });
+
+      return paragraphs;
+    }
+
+    /**
+     * Export uniquement les points de révision des comptes
+     */
+    async exportPointsRevision() {
+      try {
+        this.showQuickNotification("📋 Export Points Révision en cours...");
+        
+        const chatContainer = document.querySelector('div[class*="prose"]') || document.body;
+        const allTables = Array.from(chatContainer.querySelectorAll('table'));
+        const recosPoints = this.collectRecosRevisionPoints(allTables);
+
+        if (recosPoints.length === 0) {
+          this.showAlert("⚠️ Aucun point de révision des comptes détecté.");
+          return;
+        }
+
+        // Utiliser la même logique que exportSyntheseCAC mais uniquement pour les recos révision
+        const requestData = {
+          frap_points: [],
+          recos_revision_points: recosPoints,
+          recos_controle_interne_points: [],
+          date_rapport: new Date().toISOString().split('T')[0]
+        };
+
+        const response = await fetch('http://localhost:5000/api/word/export-synthese-cac', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestData)
+        });
+
+        if (!response.ok) throw new Error('Erreur serveur');
+
+        const blob = await response.blob();
+        const timestamp = new Date().toISOString().slice(0, 19).replace(/[:]/g, "-");
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `points_revision_${timestamp}.docx`;
+        link.click();
+        URL.revokeObjectURL(link.href);
+
+        this.showQuickNotification(`✅ Points révision exportés! (${recosPoints.length} points)`);
+
+      } catch (error) {
+        console.error("Erreur export points révision:", error);
+        this.showAlert(`❌ Erreur: ${error.message}`);
+      }
+    }
+
+    /**
+     * Export uniquement les points de contrôle interne
+     */
+    async exportPointsControleInterne() {
+      try {
+        this.showQuickNotification("🔍 Export Points Contrôle Interne en cours...");
+        
+        const chatContainer = document.querySelector('div[class*="prose"]') || document.body;
+        const allTables = Array.from(chatContainer.querySelectorAll('table'));
+        const frapPoints = this.collectFrapPoints(allTables);
+        const recosPoints = this.collectRecosControleInternePoints(allTables);
+
+        if (frapPoints.length === 0 && recosPoints.length === 0) {
+          this.showAlert("⚠️ Aucun point de contrôle interne détecté.");
+          return;
+        }
+
+        const requestData = {
+          frap_points: frapPoints,
+          recos_revision_points: [],
+          recos_controle_interne_points: recosPoints,
+          date_rapport: new Date().toISOString().split('T')[0]
+        };
+
+        const response = await fetch('http://localhost:5000/api/word/export-synthese-cac', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestData)
+        });
+
+        if (!response.ok) throw new Error('Erreur serveur');
+
+        const blob = await response.blob();
+        const timestamp = new Date().toISOString().slice(0, 19).replace(/[:]/g, "-");
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `points_controle_interne_${timestamp}.docx`;
+        link.click();
+        URL.revokeObjectURL(link.href);
+
+        const totalPoints = frapPoints.length + recosPoints.length;
+        this.showQuickNotification(`✅ Points contrôle interne exportés! (${totalPoints} points)`);
+
+      } catch (error) {
+        console.error("Erreur export points contrôle interne:", error);
+        this.showAlert(`❌ Erreur: ${error.message}`);
+      }
     }
 
     cleanup() {

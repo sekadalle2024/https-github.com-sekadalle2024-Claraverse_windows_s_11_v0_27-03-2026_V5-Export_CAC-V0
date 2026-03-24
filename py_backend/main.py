@@ -142,6 +142,14 @@ try:
 except ImportError as e:
     logger.warning(f"⚠️ Échantillonnage not available: {e}")
 
+# Import and include the Export Synthèse CAC router
+try:
+    from export_synthese_cac import router as synthese_cac_router
+    app.include_router(synthese_cac_router)
+    logger.info("✅ Export Synthèse CAC router loaded successfully")
+except ImportError as e:
+    logger.warning(f"⚠️ Export Synthèse CAC not available: {e}")
+
 # Import and include the diffusers API router
 # Add CORS middleware
 app.add_middleware(
