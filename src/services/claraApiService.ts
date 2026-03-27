@@ -803,6 +803,51 @@ export class ClaraApiService {
     }
 
     // ========================================================================
+    // FORMAT 7: METHODO REVISION — Array with "Sous-section" / "Sub-items"
+    // Similar to CIA format but for revision methodology
+    // ========================================================================
+    if (
+      Array.isArray(result) &&
+      result.length > 0 &&
+      result[0] &&
+      typeof result[0] === "object" &&
+      "Sous-section" in result[0] &&
+      "Sub-items" in result[0]
+    ) {
+      const firstSection = result[0]["Sous-section"] || "";
+      
+      // Detect if it's methodo_revision based on content patterns
+      const isMethodoRevision = 
+        firstSection.includes("AA") || // Test reference like "AA040"
+        firstSection.includes("Rapprochements") ||
+        firstSection.includes("Cadrage") ||
+        firstSection.toLowerCase().includes("audit") ||
+        firstSection.toLowerCase().includes("contrôle");
+      
+      if (isMethodoRevision) {
+        console.log("✅ FORMAT 7 DETECTE: Réponse METHODO REVISION avec 'Sous-section' / 'Sub-items'");
+        console.log("📊 Structure détectée:", {
+          totalSections: result.length,
+          firstSection: firstSection,
+          subItemsCount: result[0]["Sub-items"]?.length || 0,
+        });
+        
+        const content = `__METHODO_REVISION_ACCORDION__${JSON.stringify(result)}`;
+        
+        console.log("🔍 === FIN ANALYSE (FORMAT 7 - METHODO REVISION Accordion) ===");
+        return {
+          content,
+          metadata: {
+            format: "methodo_revision_accordion",
+            timestamp: new Date().toISOString(),
+            totalSections: result.length,
+            endpoint: "methodo_revision",
+          },
+        };
+      }
+    }
+
+    // ========================================================================
     // FORMAT 6: CIA QCM — Array with "Etape mission - CIA" containing tables
     // OU format avec erreur contenant du JSON dans un bloc markdown
     // ========================================================================
@@ -918,6 +963,41 @@ export class ClaraApiService {
     }
 
     // ========================================================================
+    // FORMAT 7: GUIDE DES COMMANDES — Array with "data" containing "Sous-section" / "Sub-items"
+    // ========================================================================
+    if (
+      Array.isArray(result) &&
+      result.length > 0 &&
+      result[0] &&
+      typeof result[0] === "object" &&
+      "data" in result[0] &&
+      Array.isArray(result[0].data) &&
+      result[0].data.length > 0 &&
+      "Sous-section" in result[0].data[0] &&
+      "Sub-items" in result[0].data[0]
+    ) {
+      console.log('✅ FORMAT 7 DETECTE: Guide des Commandes avec structure data/Sous-section/Sub-items');
+      console.log("📊 Structure détectée:", {
+        totalSections: result[0].data.length,
+        firstSection: result[0].data[0]["Sous-section"],
+        subItemsCount: result[0].data[0]["Sub-items"]?.length || 0,
+      });
+      
+      const content = `__GUIDE_COMMANDES_ACCORDION__${JSON.stringify(result)}`;
+      
+      console.log('🔍 === FIN ANALYSE (FORMAT 7 - Guide des Commandes Accordion) ===');
+      return {
+        content,
+        metadata: {
+          format: "guide_commandes_accordion",
+          timestamp: new Date().toISOString(),
+          totalSections: result[0].data.length,
+          endpoint: "guide_des_commandes",
+        },
+      };
+    }
+
+    // ========================================================================
     // FORMAT 5: CIA COURS & METHODO AUDIT — Array with "Sous-section" / "Sub-items" structure
     // OU format avec erreur contenant du JSON dans un bloc markdown
     // ========================================================================
@@ -931,7 +1011,7 @@ export class ClaraApiService {
       "error" in result[0] &&
       "raw" in result[0]
     ) {
-      console.log('🔧 FORMAT 5 SPECIAL: Réponse avec JSON dans bloc markdown');
+      console.log('� FORMAT 5 SPECIAL: Réponse avec JSON dans bloc markdown');
       try {
         const rawContent = result[0].raw;
         // Extraire le JSON du bloc markdown ```json...```
@@ -962,7 +1042,7 @@ export class ClaraApiService {
               ? `__CIA_METHODO_ACCORDION__${JSON.stringify(dataArray)}`
               : `__CIA_ACCORDION__${JSON.stringify(dataArray)}`;
             
-            console.log(`🔍 === FIN ANALYSE (FORMAT 5 - ${isMethodoAudit ? 'METHODO AUDIT' : 'CIA COURS'} Accordion depuis markdown) ===`);
+            console.log(`� === FIN ANALYSE (FORMAT 5 - ${isMethodoAudit ? 'METHODO AUDIT' : 'CIA COURS'} Accordion depuis markdown) ===`);
             return {
               content,
               metadata: {

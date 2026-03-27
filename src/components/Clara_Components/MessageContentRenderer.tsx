@@ -21,6 +21,8 @@ import { ClaraFileAttachment } from '../../types/clara_assistant_types';
 import CiaAccordionRenderer from './CiaAccordionRenderer';
 import CiaQcmAccordionRenderer from './CiaQcmAccordionRenderer';
 import CiaMethodoAccordionRenderer from './CiaMethodoAccordionRenderer';
+import GuideCommandesAccordionRenderer from './GuideCommandesAccordionRenderer';
+import MethodoRevisionAccordionRenderer from './MethodoRevisionAccordionRenderer';
 
 // Import Chart.js components
 import {
@@ -1194,6 +1196,41 @@ const MessageContentRenderer: React.FC<MessageContentRendererProps> = React.memo
     
     return elements;
   };
+
+  // ========================================================================
+  // SPECIAL FORMAT HANDLING: Guide des Commandes Accordion
+  // ========================================================================
+  if (processedContent.content.startsWith('__GUIDE_COMMANDES_ACCORDION__')) {
+    try {
+      const jsonStr = processedContent.content.replace('__GUIDE_COMMANDES_ACCORDION__', '');
+      return (
+        <div className={`guide-commandes-accordion-container ${className}`}>
+          <GuideCommandesAccordionRenderer jsonData={jsonStr} isDark={darkMode} />
+        </div>
+      );
+    } catch (e) {
+      console.error('Failed to parse Guide Commandes Accordion data:', e);
+      // Fall back to standard rendering if parsing fails
+    }
+  }
+
+  // ========================================================================
+  // SPECIAL FORMAT HANDLING: Methodo Revision Accordion (Template Orion)
+  // ========================================================================
+  if (processedContent.content.startsWith('__METHODO_REVISION_ACCORDION__')) {
+    try {
+      const jsonStr = processedContent.content.replace('__METHODO_REVISION_ACCORDION__', '');
+      const revisionData = JSON.parse(jsonStr);
+      return (
+        <div className={`methodo-revision-accordion-container ${className}`}>
+          <MethodoRevisionAccordionRenderer data={revisionData} isDark={darkMode} />
+        </div>
+      );
+    } catch (e) {
+      console.error('Failed to parse Methodo Revision Accordion data:', e);
+      // Fall back to standard rendering if parsing fails
+    }
+  }
 
   // ========================================================================
   // SPECIAL FORMAT HANDLING: CIA Methodo Accordion
